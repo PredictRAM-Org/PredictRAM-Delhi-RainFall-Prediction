@@ -1,12 +1,10 @@
+# app.py
 import streamlit as st
 import pandas as pd
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import accuracy_score
-from sklearn.preprocessing import LabelEncoder
-from sklearn.impute import SimpleImputer
-from sklearn.preprocessing import StandardScaler
-from sklearn.pipeline import Pipeline
+from sklearn.linear_model import LinearRegression
+from sklearn.preprocessing import MinMaxScaler
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import LSTM, Dense
 
 # Load the data
 file_path = 'RainPredictionFileWithPercentage.xlsx'
@@ -18,33 +16,49 @@ windspeed_condition = (df['windspeedKmph'] >= 9) & (df['windspeedKmph'] <= 15)
 
 rain_condition = (df['maxtempC'] > 33) & (df['mintempC'] > 25) & humidity_condition & windspeed_condition
 
-df['RainPrediction'] = 'No'
 df.loc[rain_condition, 'RainPrediction'] = 'Yes'
 
-# Encode 'RainPrediction' labels to numeric values
-label_encoder = LabelEncoder()
-df['RainPrediction'] = label_encoder.fit_transform(df['RainPrediction'])
+# Calculate rain fall percentage based on humidity and windspeed
+df['RainPercentage'] = 0  # Default value
 
-# Extract month from date-time
-df['Month'] = df['date_time'].dt.month
+humidity_factor = (df['humidity'] - 40) / (60 - 40)
+windspeed_factor = (df['windspeedKmph'] - 9) / (15 - 9)
+
+rain_percentage = 10 + 60 * (humidity_factor + windspeed_factor) / 2
+df.loc[rain_condition, 'RainPercentage'] = rain_percentage
 
 # Select features and target
-selected_features = ["maxtempC", "mintempC", "humidity", "windspeedKmph", "Month"]
+selected_features = ["maxtempC", "mintempC", "humidity", "windspeedKmph"]
 X = df[selected_features]
-y = df['RainPrediction']
+y = df["RainPercentage"]
 
-# Split the data into training and testing sets
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+# Scale the features for LSTM
+scaler = MinMaxScaler()
+X_scaled = scaler.fit_transform(X)
+X_lstm = X_scaled.reshape((X_scaled.shape[0], 1, X_scaled.shape[1]))
 
-# Build a Random Forest Classifier in a pipeline
-pipeline = Pipeline([
-    ('imputer', SimpleImputer(strategy='mean')),  # Handle missing values by imputing the mean
-    ('scaler', StandardScaler()),  # Standardize numerical features
-    ('classifier', RandomForestClassifier(n_estimators=100, random_state=42))
-])
+# Build Linear Regression model
+linear_reg_model = LinearRegression()
+linear_reg_model.fit(X, y)
 
-# Fit the pipeline on the training data
-pipeline.fit(X_train, y_train)
+# Build LSTM model
+lstm_model = Sequential()
+lstm_model.add(LSTM(50, activation='relu', input_shape=(1, X_scaled.shape[1])))
+lstm_model.add(Dense(1))
+lstm_model.compile(optimizer='adam', loss='mse')
+lstm_model.fit(X_lstm, y, epochs=50, batch_size=32, verbose=0)
+
+def predict_linear_regression(maxtemp, mintemp, humidity, windspeed):
+    if (maxtemp > 33) and (mintemp > 25) and (humidity >= 40) and (humidity <= 60) and (windspeed >= 9) and (windspeed <= 15):
+        return 'Yes', 10 + 60 * ((humidity - 40) / 20 + (windspeed - 9) / 6) / 2
+    else:
+        return 'No', 0
+
+def predict_lstm(maxtemp, mintemp, humidity, windspeed):
+    new_data_scaled = scaler.transform([[maxtemp, mintemp, humidity, windspeed]])
+    new_data_lstm = new_data_scaled.reshape((1, 1, len(selected_features)))
+    lstm_prediction = lstm_model.predict(new_data_lstm)[0][0]
+    return 'Yes' if lstm_prediction > 0 else 'No', lstm_prediction
 
 # Streamlit app
 st.title("Rain Prediction App")
@@ -54,32 +68,12 @@ mintemp = st.number_input("Min Temperature (°C)")
 humidity = st.number_input("Humidity (%)")
 windspeed = st.number_input("Wind Speed (Kmph)")
 
-# Allow user to select the month
-selected_month = st.slider("Select Month", 1, 12, 1)
-
 if st.button("Predict"):
-    # Make predictions using the trained model
-    new_data = pd.DataFrame({
-        'maxtempC': [maxtemp],
-        'mintempC': [mintemp],
-        'humidity': [humidity],
-        'windspeedKmph': [windspeed],
-        'Month': [selected_month]
-    })
+    linear_reg_prediction, linear_reg_percentage = predict_linear_regression(maxtemp, mintemp, humidity, windspeed)
+    lstm_prediction, lstm_percentage = predict_lstm(maxtemp, mintemp, humidity, windspeed)
 
-    prediction = pipeline.predict(new_data)[0]
+    st.write(f"Linear Regression Prediction: {linear_reg_prediction}")
+    st.write(f"Linear Regression Percentage: {linear_reg_percentage}")
 
-    # Convert numeric prediction back to 'Yes' or 'No'
-    prediction_label = label_encoder.inverse_transform([prediction])[0]
-
-    # Predict rain percentage
-    if prediction == 1:
-        # Calculate rain percentage based on humidity and windspeed
-        humidity_factor = (humidity - 40) / (60 - 40)
-        windspeed_factor = (windspeed - 9) / (15 - 9)
-        rain_percentage = 10 + 60 * (humidity_factor + windspeed_factor) / 2
-    else:
-        rain_percentage = 0
-
-    st.write(f"Rain Prediction: {prediction_label}")
-    st.write(f"Rain Percentage: {rain_percentage:.2f}%")
+    st.write(f"LSTM Prediction: {lstm_prediction}")
+    st.write(f"LSTM Percentage: {lstm_percentage}")
