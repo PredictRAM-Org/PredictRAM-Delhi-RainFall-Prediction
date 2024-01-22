@@ -54,6 +54,9 @@ mintemp = st.number_input("Min Temperature (°C)")
 humidity = st.number_input("Humidity (%)")
 windspeed = st.number_input("Wind Speed (Kmph)")
 
+# Allow user to select the month
+selected_month = st.slider("Select Month", 1, 12, 1)
+
 if st.button("Predict"):
     # Make predictions using the trained model
     new_data = pd.DataFrame({
@@ -61,7 +64,7 @@ if st.button("Predict"):
         'mintempC': [mintemp],
         'humidity': [humidity],
         'windspeedKmph': [windspeed],
-        'Month': [1]  # Assuming January for simplicity, you can adjust this based on your input
+        'Month': [selected_month]
     })
 
     prediction = pipeline.predict(new_data)[0]
@@ -80,7 +83,3 @@ if st.button("Predict"):
 
     st.write(f"Rain Prediction: {prediction_label}")
     st.write(f"Rain Percentage: {rain_percentage:.2f}%")
-
-    # Suggest the month when rain is likely to happen
-    suggested_month = pipeline.predict_proba(new_data)[0][1]  # Probability of rain
-    st.write(f"Suggested Month for Rain: {suggested_month:.2f}")
