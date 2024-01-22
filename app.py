@@ -1,3 +1,4 @@
+import streamlit as st
 import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
@@ -42,12 +43,28 @@ pipeline = Pipeline([
 # Fit the pipeline on the training data
 pipeline.fit(X_train, y_train)
 
-# Make predictions on the test set
-y_pred = pipeline.predict(X_test)
+# Streamlit app
+st.title("Rain Prediction App")
 
-# Evaluate the model
-accuracy = accuracy_score(y_test, y_pred)
-classification_rep = classification_report(y_test, y_pred)
+maxtemp = st.number_input("Max Temperature (°C)")
+mintemp = st.number_input("Min Temperature (°C)")
+humidity = st.number_input("Humidity (%)")
+winddir_degree = st.number_input("Wind Direction Degree")
+windspeed = st.number_input("Wind Speed (Kmph)")
 
-print(f'Accuracy: {accuracy}')
-print('Classification Report:\n', classification_rep)
+if st.button("Predict"):
+    # Make predictions using the trained model
+    new_data = pd.DataFrame({
+        'maxtempC': [maxtemp],
+        'mintempC': [mintemp],
+        'humidity': [humidity],
+        'winddirDegree': [winddir_degree],
+        'windspeedKmph': [windspeed]
+    })
+
+    prediction = pipeline.predict(new_data)[0]
+
+    # Convert numeric prediction back to 'Yes' or 'No'
+    prediction_label = label_encoder.inverse_transform([prediction])[0]
+
+    st.write(f"Rain Prediction: {prediction_label}")
