@@ -25,8 +25,11 @@ df.loc[rain_condition, 'RainPrediction'] = 'Yes'
 label_encoder = LabelEncoder()
 df['RainPrediction'] = label_encoder.fit_transform(df['RainPrediction'])
 
+# Extract month from date-time
+df['Month'] = df['date_time'].dt.month
+
 # Select features and target
-selected_features = ["maxtempC", "mintempC", "humidity", "windspeedKmph"]
+selected_features = ["maxtempC", "mintempC", "humidity", "windspeedKmph", "Month"]
 X = df[selected_features]
 y = df['RainPrediction']
 
@@ -57,7 +60,8 @@ if st.button("Predict"):
         'maxtempC': [maxtemp],
         'mintempC': [mintemp],
         'humidity': [humidity],
-        'windspeedKmph': [windspeed]
+        'windspeedKmph': [windspeed],
+        'Month': [1]  # Assuming January for simplicity, you can adjust this based on your input
     })
 
     prediction = pipeline.predict(new_data)[0]
@@ -76,3 +80,7 @@ if st.button("Predict"):
 
     st.write(f"Rain Prediction: {prediction_label}")
     st.write(f"Rain Percentage: {rain_percentage:.2f}%")
+
+    # Suggest the month when rain is likely to happen
+    suggested_month = pipeline.predict_proba(new_data)[0][1]  # Probability of rain
+    st.write(f"Suggested Month for Rain: {suggested_month:.2f}")
