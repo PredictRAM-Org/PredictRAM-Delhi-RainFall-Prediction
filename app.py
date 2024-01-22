@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import classification_report, accuracy_score
+from sklearn.metrics import accuracy_score
 from sklearn.preprocessing import LabelEncoder
 from sklearn.impute import SimpleImputer
 from sklearn.preprocessing import StandardScaler
@@ -26,7 +26,7 @@ label_encoder = LabelEncoder()
 df['RainPrediction'] = label_encoder.fit_transform(df['RainPrediction'])
 
 # Select features and target
-selected_features = ["maxtempC", "mintempC", "humidity", "winddirDegree", "windspeedKmph"]
+selected_features = ["maxtempC", "mintempC", "humidity", "windspeedKmph"]
 X = df[selected_features]
 y = df['RainPrediction']
 
@@ -49,7 +49,6 @@ st.title("Rain Prediction App")
 maxtemp = st.number_input("Max Temperature (°C)")
 mintemp = st.number_input("Min Temperature (°C)")
 humidity = st.number_input("Humidity (%)")
-winddir_degree = st.number_input("Wind Direction Degree")
 windspeed = st.number_input("Wind Speed (Kmph)")
 
 if st.button("Predict"):
@@ -58,7 +57,6 @@ if st.button("Predict"):
         'maxtempC': [maxtemp],
         'mintempC': [mintemp],
         'humidity': [humidity],
-        'winddirDegree': [winddir_degree],
         'windspeedKmph': [windspeed]
     })
 
@@ -67,4 +65,14 @@ if st.button("Predict"):
     # Convert numeric prediction back to 'Yes' or 'No'
     prediction_label = label_encoder.inverse_transform([prediction])[0]
 
+    # Predict rain percentage
+    if prediction == 1:
+        # Calculate rain percentage based on humidity and windspeed
+        humidity_factor = (humidity - 40) / (60 - 40)
+        windspeed_factor = (windspeed - 9) / (15 - 9)
+        rain_percentage = 10 + 60 * (humidity_factor + windspeed_factor) / 2
+    else:
+        rain_percentage = 0
+
     st.write(f"Rain Prediction: {prediction_label}")
+    st.write(f"Rain Percentage: {rain_percentage:.2f}%")
